@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="小瑶工作台">
+<meta name="theme-color" content="#4f46e5">
+<title>小瑶工作台</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --primary: #4f46e5;
+    --primary-light: #6366f1;
+    --primary-dark: #4338ca;
+    --bg: #f3f4f6;
+    --card: #ffffff;
+    --text: #1f2937;
+    --text-light: #6b7280;
+    --border: #e5e7eb;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --pink: #ec4899;
+    --pink-light: #fce7f3;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html, body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+  }
+
+  /* 顶部标题栏 */
+  .header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--pink) 100%);
+    color: white;
+    padding: calc(16px + var(--safe-top)) 20px 20px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 12px rgba(79,70,229,0.25);
+  }
+  .header-row { display: flex; align-items: center; justify-content: space-between; }
+  .header-title { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .header-date { font-size: 13px; opacity: 0.92; margin-top: 4px; }
+  .header-stats { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .stat-pill {
+    background: rgba(255,255,255,0.22); backdrop-filter: blur(10px);
+    padding: 6px 12px; border-radius: 20px; font-size: 12px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .stat-pill .num { font-weight: 700; font-size: 14px; }
+
+  /* 主体两栏布局 */
+  .layout {
+    max-width: 1200px; margin: 0 auto; padding: 16px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; padding: 12px; gap: 12px; }
+  }
+  body { padding-bottom: calc(70px + var(--safe-bottom)); }
+
+  .col { display: flex; flex-direction: column; gap: 16px; }
+
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .section-title {
+    font-size: 16px; font-weight: 700;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .section-icon { width: 26px; height: 26px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; font-size: 15px; }
+  .section-action {
+    font-size: 13px; color: var(--primary); padding: 5px 10px;
+    border-radius: 8px; background: rgba(79,70,229,0.08); cursor: pointer;
+  }
+  .section-action.pink { color: var(--pink); background: var(--pink-light); }
+
+  .card {
+    background: var(--card); border-radius: 14px; padding: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+
+  /* 任务项 */
+  .task-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 12px; background: var(--bg); border-radius: 10px;
+    margin-bottom: 8px; transition: all 0.2s;
+  }
+  .task-item:last-child { margin-bottom: 0; }
+  .task-item.done { opacity: 0.55; }
+  .task-item.done .task-name { text-decoration: line-through; }
+  .check-btn {
+    width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border);
+    background: white; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 15px; color: white; cursor: pointer; transition: all 0.2s;
+  }
+  .check-btn.checked { background: var(--success); border-color: var(--success); }
+  .task-name { flex: 1; font-size: 14px; }
+  .task-meta { font-size: 11px; color: var(--text-light); margin-top: 2px; }
+  .del-btn { color: var(--danger); font-size: 18px; padding: 4px; opacity: 0.5; cursor: pointer; }
+  .del-btn:hover { opacity: 1; }
+
+  .empty { text-align: center; padding: 20px; color: var(--text-light); font-size: 13px; }
+
+  /* 进度条 */
+  .progress-bar {
+    height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 12px;
+  }
+  .progress-fill {
+    height: 100%; background: linear-gradient(90deg, var(--success), #34d399);
+    border-radius: 3px; transition: width 0.3s;
+  }
+
+  /* 热榜项 */
+  .hot-list { display: flex; flex-direction: column; gap: 6px; }
+  .hot-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; background: var(--bg); border-radius: 10px;
+    text-decoration: none; color: inherit;
+  }
+  .hot-rank {
+    width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: white;
+  }
+  .hot-rank.r1 { background: #ef4444; }
+  .hot-rank.r2 { background: #f97316; }
+  .hot-rank.r3 { background: #f59e0b; }
+  .hot-rank.rn { background: #9ca3af; }
+  .hot-title { flex: 1; font-size: 13px; line-height: 1.4; }
+  .hot-hot { font-size: 11px; color: var(--danger); font-weight: 600; white-space: nowrap; }
+  .hot-loading { text-align: center; padding: 20px; color: var(--text-light); font-size: 13px; }
+  .hot-meta { margin-top: 8px; font-size: 11px; color: var(--text-light); text-align: center; }
+  .source-tag {
+    font-size: 10px; padding: 1px 5px; border-radius: 4px;
+    background: rgba(79,70,229,0.1); color: var(--primary); margin-right: 4px;
+  }
+
+  /* 阅读卡片 */
+  .reading-section { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px dashed var(--border); }
+  .reading-section:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+  .reading-tag {
+    display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    background: rgba(79,70,229,0.1); color: var(--primary); font-weight: 600; margin-bottom: 8px;
+  }
+  .reading-text {
+    font-size: 15px; line-height: 1.8; color: var(--text);
+    font-family: 'PingFang SC','Songti SC','STSong',serif;
+  }
+  .reading-text.poem { font-size: 17px; text-align: center; letter-spacing: 1px; color: #831843; }
+  .reading-source { font-size: 12px; color: var(--text-light); margin-top: 8px; text-align: right; }
+  .reading-vocab {
+    margin-top: 10px; padding: 8px 10px; background: rgba(245,158,11,0.08);
+    border-radius: 8px; font-size: 12px; color: #92400e; line-height: 1.6;
+  }
+  .reading-vocab b { color: #78350f; }
+
+  /* AI视频 */
+  .video-tabs { display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto; }
+  .video-tab {
+    padding: 6px 12px; border-radius: 16px; font-size: 12px; white-space: nowrap;
+    background: var(--bg); color: var(--text-light); cursor: pointer;
+  }
+  .video-tab.active { background: var(--primary); color: white; }
+  .video-card { background: var(--bg); border-radius: 10px; padding: 12px; margin-bottom: 8px; }
+  .video-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .video-title { flex: 1; font-size: 14px; font-weight: 600; border: none; background: transparent; }
+  .video-title:focus { outline: none; }
+  .status-badge { font-size: 11px; padding: 3px 8px; border-radius: 10px; font-weight: 600; }
+  .status-选题 { background: #dbeafe; color: #1e40af; }
+  .status-脚本 { background: #fef3c7; color: #92400e; }
+  .status-录制中 { background: #fce7f3; color: #9d174d; }
+  .status-剪辑中 { background: #e0e7ff; color: #3730a3; }
+  .status-已发布 { background: #d1fae5; color: #065f46; }
+  .video-field { font-size: 12px; color: var(--text-light); margin-bottom: 6px; }
+  .video-field label { display: block; margin-bottom: 2px; }
+  .video-field textarea, .video-field input {
+    width: 100%; border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 8px; font-size: 12px; background: white; color: var(--text); resize: vertical; min-height: 32px;
+  }
+  .video-field textarea:focus, .video-field input:focus { outline: none; border-color: var(--primary); }
+  .video-status-select { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  .vs-btn { font-size: 11px; padding: 3px 8px; border-radius: 10px; background: white; border: 1px solid var(--border); color: var(--text-light); cursor: pointer; }
+  .vs-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+  .video-actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .video-actions .del-btn { font-size: 12px; opacity: 1; }
+
+  /* 底部导航 */
+  .tabbar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(255,255,255,0.95); backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border); display: flex;
+    padding-bottom: var(--safe-bottom); z-index: 200;
+  }
+  .tab-item {
+    flex: 1; padding: 8px 0; text-align: center; color: var(--text-light); font-size: 11px;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer;
+  }
+  .tab-item.active { color: var(--primary); }
+  .tab-icon { font-size: 20px; }
+
+  /* 弹窗 */
+  .modal-mask {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300;
+    display: none; align-items: center; justify-content: center;
+  }
+  .modal-mask.show { display: flex; }
+  .modal {
+    background: white; border-radius: 16px; width: 90%; max-width: 420px;
+    padding: 20px; max-height: 85vh; overflow-y: auto; position: relative;
+    animation: pop 0.2s ease;
+  }
+  @keyframes pop { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; text-align: center; }
+  .modal-close { position: absolute; top: 14px; right: 18px; font-size: 22px; color: var(--text-light); cursor: pointer; }
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 13px; color: var(--text-light); margin-bottom: 6px; display: block; }
+  .form-input, .form-textarea {
+    width: 100%; padding: 10px 12px; border: 1.5px solid var(--border);
+    border-radius: 10px; font-size: 14px; background: var(--bg);
+  }
+  .form-input:focus, .form-textarea:focus { outline: none; border-color: var(--primary); }
+  .form-textarea { min-height: 80px; resize: vertical; }
+  .btn-primary {
+    width: 100%; background: var(--primary); color: white; border: none;
+    padding: 12px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .btn-primary.pink { background: var(--pink); }
+
+  .page { display: none; }
+  .page.active { display: block; }
+  ::-webkit-scrollbar { width: 0; height: 0; }
+</style>
+</head>
+<body>
+
+<!-- 顶部 -->
+<div class="header">
+  <div class="header-row">
+    <div>
+      <div class="header-title">🏠 小瑶工作台</div>
+      <div class="header-date" id="todayDate">加载中...</div>
+    </div>
+    <div class="header-stats">
+      <div class="stat-pill">✅ <span class="num" id="doneCount">0</span>/<span id="totalCount">0</span></div>
+      <div class="stat-pill">🔥 连续 <span class="num" id="streakDays">0</span> 天</div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 首页（两栏布局） ====== -->
+<div class="page active" id="page-home">
+  <div class="layout">
+
+    <!-- 左栏：每日计划 -->
+    <div class="col">
+      <div class="card">
+        <div class="section-header">
+          <div class="section-title"><span class="section-icon" style="background:rgba(16,185,129,0.12);">📋</span>每日计划</div>
+          <span class="section-action" onclick="openTaskModal()">+ 新增</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        <div id="taskList"></div>
+      </div>
+
+      <!-- 每日阅读 -->
+      <div class="card">
+        <div class="section-header">
+          <div class="section-title"><span class="section-icon" style="background:rgba(245,158,11,0.12);">📖</span>每日阅读</div>
+          <span class="section-action" onclick="loadReading(true)">↻ 换一篇</span>
+        </div>
+        <div id="readingCard"><div class="hot-loading">加载今日阅读...</div></div>
+        <div class="hot-meta" id="readingMeta"></div>
+      </div>
+    </div>
+
+    <!-- 右栏：女装爆款推荐 + 热点视频 -->
+    <div class="col">
+      <!-- 选题每日女装爆款推荐 -->
+      <div class="card">
+        <div class="section-header">
+          <div class="section-title"><span class="section-icon" style="background:var(--pink-light);">👗</span>每日女装爆款推荐</div>
+          <span class="section-action pink" onclick="loadFashionHot()">↻ 刷新</span>
+        </div>
+        <div class="hot-list" id="fashionHotList"><div class="hot-loading">加载中...</div></div>
+        <div class="hot-meta" id="fashionHotMeta"></div>
+      </div>
+
+      <!-- 爆款热点女装视频 -->
+      <div class="card">
+        <div class="section-header">
+          <div class="section-title"><span class="section-icon" style="background:rgba(239,68,68,0.12);">🔥</span>爆款热点女装视频</div>
+          <span class="section-action pink" onclick="loadFashionVideo()">↻ 刷新</span>
+        </div>
+        <div class="hot-list" id="fashionVideoList"><div class="hot-loading">加载中...</div></div>
+        <div class="hot-meta" id="fashionVideoMeta"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ====== AI视频页 ====== -->
+<div class="page" id="page-video">
+  <div class="layout" style="grid-template-columns:1fr;">
+    <div class="col">
+      <div class="card">
+        <div class="section-header">
+          <div class="section-title"><span class="section-icon" style="background:rgba(79,70,229,0.12);">🎬</span>AI视频选题</div>
+          <span class="section-action" onclick="openVideoModal()">+ 新建选题</span>
+        </div>
+        <div class="video-tabs" id="videoTabs">
+          <div class="video-tab active" onclick="filterVideo('all', this)">全部</div>
+          <div class="video-tab" onclick="filterVideo('选题', this)">选题</div>
+          <div class="video-tab" onclick="filterVideo('脚本', this)">脚本</div>
+          <div class="video-tab" onclick="filterVideo('录制中', this)">录制中</div>
+          <div class="video-tab" onclick="filterVideo('剪辑中', this)">剪辑中</div>
+          <div class="video-tab" onclick="filterVideo('已发布', this)">已发布</div>
+        </div>
+        <div id="videoList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 数据页 ====== -->
+<div class="page" id="page-stats">
+  <div class="layout" style="grid-template-columns:1fr;">
+    <div class="col">
+      <div class="card">
+        <div class="section-header"><div class="section-title"><span class="section-icon">📊</span>本周概览</div></div>
+        <div id="weekStats"></div>
+      </div>
+      <div class="card">
+        <div class="section-header"><div class="section-title"><span class="section-icon">📁</span>数据管理</div></div>
+        <button class="btn-primary" onclick="exportData()" style="margin-bottom:10px;">📤 导出数据备份</button>
+        <button class="btn-primary" onclick="importData()" style="background:#6b7280;">📥 导入数据</button>
+        <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImport(event)">
+      </div>
+      <div class="card" style="font-size:13px;line-height:1.8;color:var(--text-light);">
+        <p>📱 <b>添加到主屏幕</b>：浏览器打开 → 分享 → 添加到主屏幕，像App一样用。</p>
+        <p style="margin-top:8px;">💾 <b>数据存储</b>：所有数据存手机本地，请定期导出备份。</p>
+        <p style="margin-top:8px;">🔄 <b>每日重置</b>：任务打卡每天零点重置，AI视频进度持续保留。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 底部导航 -->
+<div class="tabbar">
+  <div class="tab-item active" onclick="switchPage('home', this)"><span class="tab-icon">🏠</span>工作台</div>
+  <div class="tab-item" onclick="switchPage('video', this)"><span class="tab-icon">🎬</span>AI视频</div>
+  <div class="tab-item" onclick="switchPage('stats', this)"><span class="tab-icon">📊</span>数据</div>
+</div>
+
+<!-- 新增任务弹窗 -->
+<div class="modal-mask" id="taskModal">
+  <div class="modal">
+    <span class="modal-close" onclick="closeModal('taskModal')">×</span>
+    <div class="modal-title">新增每日任务</div>
+    <div class="form-group">
+      <label class="form-label">任务名称</label>
+      <input type="text" class="form-input" id="taskName" placeholder="如：敷面膜15分钟">
+    </div>
+    <div class="form-group">
+      <label class="form-label">备注 / 时长（选填）</label>
+      <input type="text" class="form-input" id="taskNote" placeholder="如：20分钟、每周三次">
+    </div>
+    <button class="btn-primary" onclick="addTask()">添加</button>
+  </div>
+</div>
+
+<!-- 新建AI视频弹窗 -->
+<div class="modal-mask" id="videoModal">
+  <div class="modal">
+    <span class="modal-close" onclick="closeModal('videoModal')">×</span>
+    <div class="modal-title">新建AI视频选题</div>
+    <div class="form-group">
+      <label class="form-label">选题标题</label>
+      <input type="text" class="form-input" id="vidTitle" placeholder="如：AI一键生成女装口播视频">
+    </div>
+    <div class="form-group">
+      <label class="form-label">脚本要点</label>
+      <textarea class="form-textarea" id="vidScript" placeholder="开头钩子、核心内容、结尾引导关注..."></textarea>
+    </div>
+    <button class="btn-primary" onclick="addVideo()">创建</button>
+  </div>
+</div>
+
+<script>
+// ============ 数据层 ============
+const STORE_KEY = 'xiaoyao_workbench_v2';
+const VIDEO_STATUSES = ['选题', '脚本', '录制中', '剪辑中', '已发布'];
+const DEFAULT_TASKS = [
+  { id: 1, name: '每天运动40分钟', note: '有氧/力量/拉伸', done: false, preset: true },
+  { id: 2, name: '阅读文章30分钟', note: '见下方每日阅读卡片', done: false, preset: true },
+  { id: 3, name: '监督小孩做作业', note: '阅读/口算/写字', done: false, preset: true },
+  { id: 4, name: '陪小幼崽出门溜达', note: '散步/公园/运动', done: false, preset: true },
+  { id: 5, name: '和老公贴贴', note: '每日甜蜜时刻', done: false, preset: true }
+];
+
+let state = loadState();
+let videoFilter = 'all';
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function defaultState() {
+  return { created: todayKey(), lastOpen: '', streak: 0, days: {}, videos: [], videoSeq: 1, taskSeq: 100 };
+}
+function defaultDay() {
+  return { tasks: JSON.parse(JSON.stringify(DEFAULT_TASKS)) };
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return defaultState();
+    const s = JSON.parse(raw);
+    if (!s.days) s.days = {};
+    if (!s.videos) s.videos = [];
+    if (!s.taskSeq) s.taskSeq = 100;
+    return s;
+  } catch(e) { return defaultState(); }
+}
+function saveState() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+function getDay() {
+  const k = todayKey();
+  if (!state.days[k]) state.days[k] = defaultDay();
+  return state.days[k];
+}
+
+function calcStreak() {
+  let streak = 0;
+  let d = new Date();
+  while (true) {
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const day = state.days[key];
+    if (day && day.tasks.length > 0 && day.tasks.every(t => t.done)) {
+      streak++; d.setDate(d.getDate() - 1);
+    } else {
+      if (key === todayKey() && !day) { d.setDate(d.getDate() - 1); continue; }
+      break;
+    }
+  }
+  return streak;
+}
+
+// ============ 页面切换 ============
+function switchPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+// ============ 顶部渲染 ============
+function renderHeader() {
+  const d = new Date();
+  const week = ['日','一','二','三','四','五','六'][d.getDay()];
+  document.getElementById('todayDate').textContent = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日 星期${week}`;
+  const day = getDay();
+  const done = day.tasks.filter(t => t.done).length;
+  const total = day.tasks.length;
+  document.getElementById('doneCount').textContent = done;
+  document.getElementById('totalCount').textContent = total;
+  document.getElementById('streakDays').textContent = calcStreak();
+  document.getElementById('progressFill').style.width = total > 0 ? (done/total*100) + '%' : '0%';
+}
+
+// ============ 每日任务 ============
+function renderTasks() {
+  const day = getDay();
+  const list = document.getElementById('taskList');
+  if (day.tasks.length === 0) {
+    list.innerHTML = '<div class="empty">还没有任务，点击右上角新增</div>';
+    return;
+  }
+  list.innerHTML = day.tasks.map(t => `
+    <div class="task-item ${t.done ? 'done' : ''}">
+      <div class="check-btn ${t.done ? 'checked' : ''}" onclick="toggleTask(${t.id})">${t.done ? '✓' : ''}</div>
+      <div style="flex:1;">
+        <div class="task-name">${escapeHtml(t.name)}</div>
+        ${t.note ? `<div class="task-meta">${escapeHtml(t.note)}</div>` : ''}
+      </div>
+      <span class="del-btn" onclick="delTask(${t.id})">×</span>
+    </div>
+  `).join('');
+}
+
+function openTaskModal() {
+  document.getElementById('taskName').value = '';
+  document.getElementById('taskNote').value = '';
+  document.getElementById('taskModal').classList.add('show');
+}
+function addTask() {
+  const name = document.getElementById('taskName').value.trim();
+  if (!name) { alert('请输入任务名称'); return; }
+  const note = document.getElementById('taskNote').value.trim();
+  const day = getDay();
+  day.tasks.push({ id: state.taskSeq++, name, note, done: false, preset: false });
+  saveState();
+  renderTasks(); renderHeader();
+  closeModal('taskModal');
+}
+function toggleTask(id) {
+  const day = getDay();
+  const t = day.tasks.find(x => x.id === id);
+  if (t) { t.done = !t.done; saveState(); renderTasks(); renderHeader(); }
+}
+function delTask(id) {
+  if (!confirm('删除这个任务？')) return;
+  const day = getDay();
+  day.tasks = day.tasks.filter(x => x.id !== id);
+  saveState(); renderTasks(); renderHeader();
+}
+
+// ============ 每日阅读（短篇文章） ============
+const READING_LIBRARY = [
+  {
+    title: "读书的女人",
+    author: "三毛",
+    source: "《送你一匹马》节选",
+    content: "读书多了，容颜自然改变。许多时候，自己可能以为许多看过的书籍都成过眼烟云，不复记忆，其实它们仍是潜在的。在气质里，在谈吐上，在胸襟的无涯，当然也可能显露在生活和文字中。\n\n我喜欢读书，不是因为我想成为一个有学问的人，而是因为只有在书里，我才能找到那个安静的自己。外面的世界太吵了，每天都有处理不完的事情，操不完的心。可是当我翻开一本书，世界就忽然静了下来。\n\n女人一定要读书。不是为了文凭，不是为了工作，而是为了在柴米油盐之外，心里还留一片干净的地方。那里只属于你自己，谁也拿不走。当你老去，皱纹会爬上眼角，但读书养出来的气度，会让你在人群中一眼就被认出来——那是一个被文字浸润过的灵魂。",
+    vocab: "无涯（yá）：无边无际。浸润：液体慢慢渗入，比喻逐渐受影响。"
+  },
+  {
+    title: "安静的力量",
+    author: "林徽因",
+    source: "散文摘录",
+    content: "真正的平静，不是避开车马喧嚣，而是在心中修篱种菊。\n\n我们这一代女人，活得太累了。要在职场上拼杀，要在家庭里周旋，要照顾孩子，要讨好老人，还要时刻警惕自己别落后于时代。每天都像一只陀螺，被生活的鞭子抽着转个不停。\n\n可是你有没有想过，陀螺转得再快，也只是在原地。真正的向前，是停下来，看清方向，再迈步。\n\n我见过太多女人，三十岁一过，眼神就浑浊了。不是老了，是疲了。那种疲惫不是睡一觉能恢复的，是心被掏空了的疲。要补回来，只有一条路——给自己留一段安静的时间。\n\n哪怕每天只有半小时。关掉手机，不看消息，不回微信。就那么坐着，或者读几页书，或者发一会儿呆。你会发现，半小时后，那个疲惫的自己，又活过来了。\n\n安静，是女人最好的保养品。比任何护肤品都管用。",
+    vocab: "喧嚣（xuān xiāo）：声音杂乱吵闹。陀螺：一种玩具，比喻忙碌不停。"
+  },
+  {
+    title: "关于年龄",
+    author: "杨绛",
+    source: "《走到人生边上》节选",
+    content: "一个人经过不同程度的锻炼，就获得不同程度的修养、不同程度的效益。好比香料，捣得愈碎，磨得愈细，香得愈浓烈。\n\n女人过了���十，常常会焦虑。照镜子时发现第一根白发，发现眼角的纹路不再消失，发现熬一个夜要三天才能缓过来。于是开始恐慌，觉得自己在走下坡路。\n\n可是我不这样想。三十岁之前，我们是璞玉，是毛坯，是未经打磨的原石。三十岁之后，才是真正开始雕刻的时候。每一道皱纹，都是生活刻下的纹路；每一根白发，都是岁月染上的霜。它们不是衰老的标志，是成长的勋章。\n\n年轻时的美，是爹妈给的，不费力。可三十岁之后的美，是自己挣来的——靠读书，靠阅历，靠跌倒后重新站起来的勇气，靠看透世事仍然热爱生活的豁达。\n\n所以不必怕老。怕的是老了却没有长进，怕的是岁月只留下了皱纹，却没有留下智慧。只要一直在读书，一直在思考，一直在认真地活，年龄就只是一个数字。",
+    vocab: "璞玉（pú yù）：未雕琢的玉。豁达：心胸开阔。"
+  },
+  {
+    title: "给自己的信",
+    author: "亦舒",
+    source: "散文摘录",
+    content: "亲爱的自己：\n\n今天又是忙碌的一天。早起做早餐，送孩子上学，赶去上班，中午匆匆吃个外卖，下午开会开到头晕，下班接孩子，回家做饭，辅导作业，洗衣服，收拾屋子。等你终于坐下来，已经晚上十点了。\n\n你看着镜子里那个脸色蜡黄、眼神疲惫的女人，忽然有点不认识她了。她是谁？她什么时候变成了这个样子？\n\n你忘了，你曾经也是个爱笑的姑娘。你喜欢穿白裙子，喜欢在阳光下奔跑，喜欢读诗，喜欢做梦。你说以后要去看世界，要写一本书，要过一种不被定义的人生。\n\n后来呢？后来你成了妻子，成了母亲，成了员工，成了女儿，成了所有人需要的人。唯独，忘了成为你自己。\n\n所以今晚，我想给你写这封信。请你记住：你不只是谁的妻子、谁的母亲、谁的员工。你首先是你自己。\n\n明天早上，比平时早起十分钟。不为别人，只为自己。泡一杯茶，读两页书，看看窗外的天。那十分钟里，你不是任何人的谁。你就是你。",
+    vocab: "蜡黄：颜色黄而暗淡。定义：对事物的本质或范围做出规定。"
+  },
+  {
+    title: "慢一点，没关系",
+    author: "张德芬",
+    source: "《遇见未知的自己》节选",
+    content: "我们总是被催着长大。\n\n小时候被催着学习，长大了被催着结婚，结婚了被催着生孩子，生完孩子被催着生二胎，然后被催着买房、换车、升职、加薪。好像人生是一场接力赛，每一棒都有人在后面追，稍慢一步就被淘汰。\n\n可是你有没有想过，这是谁定的规则？是谁说三十岁必须结婚？是谁说结婚必须买房？是谁说人生必须按部就班地走？\n\n其实没有谁。是社会舆论，是父母期望，是你自己内心的恐惧。\n\n我认识一个女人，三十五岁才结婚，嫁给了一个普通人，过着普通的日子。可她是我见过最幸福的女人。因为她等到了对的人，而不是在三十岁那年随便找个人凑合。\n\n我还认识一个女人，四十岁开始学画画，五十岁办了画展。她说，前四十年都在为别人活，后四十年要为自己活。\n\n所以，慢一点，真的没关系。花开有早晚，人有自己的时区。你只需要按照自己的节奏走，不必和别人比。\n\n这一生，是你自己的。不是给别人看的。",
+    vocab: "按部就班：按照条理，遵循顺序。舆论：群众的言论。"
+  },
+  {
+    title: "独处的艺术",
+    author: "毕淑敏",
+    source: "《教养的关系花园》节选",
+    content: "一个女人，一定要学会独处。\n\n不是孤独，是独处。孤独是被迫的，独处是主动的。孤独是没人陪，独处是不需要人陪。\n\n我见过太多女人，一刻也离不开人群。下了班约朋友逛街，周末必须有人陪，一个人吃饭觉得可怜，一个人看电影觉得丢人。她们把热闹当成安全感，把陪伴当成存在感。\n\n可是热闹散去之后呢？那种空虚反而更深。因为你把快乐的开关交到了别人手里，别人不在，你就不会快乐了。\n\n真正强大的女人，都能享受独处。她可以一个人去咖啡馆坐一下午，一个人去看展览，一个人去旅行。不是因为没有人陪，而是因为她觉得独处时，才能听见自己内心的声音。\n\n独处是一种能力，不是天生的，需要练习。从每天独处半小时开始，关掉手机，不看消息。你可以读书，可以写字，可以发呆，可以什么都不做。\n\n慢慢地，你会发现，独处时的那个你，才是最真实的你。那个你不再需要取悦任何人，不再需要扮演任何角色。你就是你，完整而自由。",
+    vocab: "取悦：取得别人的欢心。存在感：感到自身存在的价值。"
+  },
+  {
+    title: "关于坚持",
+    author: "杨绛",
+    source: "散文摘录",
+    content: "我和钟书结婚多年，日子并非一帆风顺。战乱、贫穷、分离、运动，什么苦都吃过。有人问我，怎么撑过来的。\n\n我想了想，其实没什么秘诀。就是一天一天地过，一件事一件事地做。\n\n人在顺境里，不需要坚持，因为一切都顺。真正需要坚持的，是逆境。是那些你觉得撑不下去的日子。是孩子生病你整夜整夜不敢合眼，是丈夫受难你到处奔走求人，是自己委屈得想哭却还要笑着安抚家人。\n\n那些日子，我对自己说：再过一天。就一天。明天实在不行再说。\n\n结果一天一天，居然也就过来了。回头再看，那些以为过不去的坎，都成了身后的风景。\n\n所以女人啊，别害怕困难。你以为自己很脆弱，其实你比自己想象的坚强得多。女人的韧性，是这世上最了不起的力量。水能穿石，不是因为力量大，是因为不停止。\n\n你只要不停下，就没有过不去的坎。",
+    vocab: "一帆风顺：比喻顺利无阻。韧性：物体受外力变形后能恢复原状的性质，比喻坚强持久。"
+  },
+  {
+    title: "爱自己",
+    author: "张小娴",
+    source: "散文摘录",
+    content: "常常有女人问我：怎样才能被爱？\n\n我总是回答：先学会爱自己。\n\n这话听起来老套，可真正做到的人很少。我们太习惯把爱给别人了——给孩子，给丈夫，给父母，给朋友。我们把最好的留给别人，把最差的留给自己。最好的食物，最好的时间，最好的耐心，最好的微笑。轮到自己时，只剩下疲惫、敷衍和将就。\n\n你以为这是无私，其实是亏待。一个长期亏待自己的人，是发光不起来的。你的眼神会黯淡，你的皮肤会粗糙，你的脾气会变差，你会越来越不像你自己。\n\n爱自己，不是自私，不是骄纵，不是买买买。爱自己，是像照顾一个你最在乎的人那样照顾自己。\n\n饿了就好好吃饭，别凑合。累了就休息，别硬撑。委屈了就哭出来，别憋着。想做什么就去做，别等。\n\n你会说，哪有时间。可是亲爱的，你为别人省下的那些时间，最后都变成了你眼角的皱纹和心里的结节。\n\n从今天开始，每天为自己做一件事。哪怕很小。哪怕只是涂一支喜欢的口红，喝一杯热茶，读两页书。\n\n你值得。",
+    vocab: "将就：对付、凑合。黯淡：光线微弱，比喻失去光彩。"
+  },
+  {
+    title: "生活的仪式感",
+    author: "蒋勋",
+    source: "《生活十讲》节选",
+    content: "什么是仪式感？\n\n不是过西方情人节，不是圣诞树下的自拍，不是生日的烛光晚餐。仪式感，是把普通的日子过出意义来。\n\n比如早餐。你可以匆匆啃个面包，也可以早起十分钟，煎个蛋，切几片黄瓜，把盘子摆好看，坐下来慢慢吃。同样的食物，前者叫果腹，后者叫生活。\n\n比如下班。你可以一回家就瘫在沙发上刷手机，也可以先洗个澡，换上舒服的衣服，泡杯茶，再开始晚上的时光。同样的时间，前者叫熬日子，后者叫过日子。\n\n我见过一个女人，每天睡前会在床头放一杯水，旁边放一本书。她说这是她给自己的仪式——不管白天多累，睡前都要读几页书。这十几分钟，是她一天里最珍贵的时光。\n\n仪式感不需要花钱，不需要别人配合，不需要特殊的日子。它只是一种态度——认真对待当下的每一刻。\n\n生活本来就是琐碎的，重复的，有时是乏味的。可仪式感能让琐碎变成精致，让重复变成韵律，让乏味变成安宁。\n\n女人尤其需要仪式感。因为我们的生活太容易被家务和孩子淹没。仪式感，是我们在洪流里抱住的一根木——它提醒我们，我是谁，我值得过怎样的生活。",
+    vocab: "果腹：吃饱肚子。韵律：诗歌中的声韵和规律，引申为节奏感。"
+  },
+  {
+    title: "关于变老",
+    author: "奥黛丽·赫本",
+    source: "名言与散文摘录",
+    content: "若要优美的嘴唇，要讲亲切的话；若要可爱的眼睛，要看到别人的好处；若要苗条的身材，把你的食物分给饥饿的人；若要美丽的头发，让小孩子每天抚摸它。\n\n这是我说过的话，可我想说的不止这些。\n\n女人都怕老。可我觉得，老并不可怕。可怕的是，老了却没有变成更好的自己。\n\n年轻时的美，是皮相。会消逝，会褪色，会被时间带走。任谁也留不住。可有一种美，是骨相，是岁月夺不走的。那就是一个女人读过的书，走过的路，爱过的人，受过的苦，以及这一切加在一起，沉淀出来的从容。\n\n我见过八十岁的女人，依然光彩照人。不是因为保养得当，而是因为她的眼神里有故事，她的谈吐里有山河，她的笑容里有对这世界的善意。\n\n我也见过三十岁的女人，已经老气横秋。不是脸上有了皱纹，而是眼里没了光，话里没了热情，对生活没了期待。\n\n所以，真正的抗衰老，不是涂多贵的面霜，而是保持对世界的好奇，保持读书的习惯，保持一颗柔软的心。\n\n女人的美丽，会随着岁月沉淀而愈发醇厚。就像好酒，越陈越香。",
+    vocab: "皮相：外表。骨相：内在的气质。醇厚：（酒）纯正浓厚，比喻气质深沉。"
+  },
+  {
+    title: "给疲惫的你",
+    author: "林清玄",
+    source: "散文摘录",
+    content: "今天你累了吗？\n\n我猜你一定累了吧。做了早餐，送了孩子，上了一天班，挤了地铁，买了菜，做了晚饭，辅导了作业，哄了睡觉。等你终于能躺下，已经夜里十一点。\n\n你翻了个身，骨头都在响。你想，明天又是这样的一天。后天也是。大后天也是。日子像复印机，一张一张吐出来，全是同样的内容。\n\n你忽然有点想哭。不是委屈，是疲惫。是那种说不清的、从骨头缝里渗出来的疲惫。\n\n我想告诉你，我懂。我也这样过。\n\n可是你知道吗，疲惫的时候，正是你该停下的时候。不是继续硬撑，不是喝杯咖啡再战，是真正地停下来。\n\n停下来，不代表你不行。停下来，是为了让自己重新行。\n\n就像琴弦，绷得太紧会断，松一松才能弹出好声音。人也一样。\n\n所以明天，给自己放个假吧。不必远行，不必花钱。就让孩子看一小时动画片，就让碗先泡在水池里，就让衣服明天再洗。你泡个澡，听首歌，或者什么都不做，就躺着。\n\n天塌不下来。你已经做得很好了。真的。",
+    vocab: "复印机：比喻重复无变化。琴弦：乐器上发声的线。"
+  },
+  {
+    title: "女人的独立",
+    author: "亦舒",
+    source: "《我的前半生》随笔",
+    content: "女人一定要独立。这话说了无数遍，可真正做到的女人不多。\n\n不是嘴上说说就算独立了。真正的独立，是经济上的，也是精神上的。\n\n经济上的独立，是你自己能挣钱，不必看任何人的脸色。想买什么自己买，想去哪里自己去。不必低声下气地开口要钱，不必为了一顿饭钱委曲求全。\n\n精神上的独立，更难。是你有自己的判断，不被人牵着鼻子走。是你独处时不会慌，是你做决定时不依赖别人。是你知道，离开任何人，你都能活得很好。\n\n我见过太多女人，结了婚就把全部身心交给家庭，放弃了工作，放弃了朋友，放弃了自我。等到有一天婚姻出了问题，才发现自己一无所有——没有收入，没有技能，没有人脉，连重新开始的勇气都没有。\n\n所以无论何时，女人都要保留一张底牌。这份工作是你的，这笔存款是你的，这个朋友圈是你的，这项技能是你的。谁也拿不走。\n\n独立不是孤独，不是不需要别人。独立是——有你在，我很好；没你在，我也过得去。这样的女人，才不会被生活打倒。",
+    vocab: "委曲求全：勉强迁就以求保全。底牌：扑克中最后亮出的牌，比喻保底的资本。"
+  },
+  {
+    title: "窗外的树",
+    author: "宗璞",
+    source: "散文摘录",
+    content: "我家窗外有一棵树，不知道种了多少年了。\n\n我搬来的时候它就在那里，瘦瘦的，不高。我忙着工作，忙着带娃，从来没正眼看过它。直到有一年春天，我难得早起，拉开窗帘，发现它居然开花了。\n\n满树的白花，一簇一簇的，像落了一层雪。我呆呆地看了很久，忽然就流泪了。\n\n不是因为花多美，是因为我太久没有注意过美了。每天睁眼就是闹钟、早餐、孩子的书包、地铁、会议、晚饭、作业。日子过得像打仗，哪有空看花。\n\n可是那棵树，它不声不响地长了这么多年，没有人浇水，没有人施肥，没有人夸它一句。它就自己开花，自己结果，自己落叶，自己过冬。年年如此，从不缺席。\n\n我忽然觉得，这棵树比我有力量。我总在抱怨生活苦，可它什么也没说，只是默默地把日子过成了花。\n\n从那天起，我开始留意窗外的树。春天看它发芽，夏天看它浓绿，秋天看它金黄，冬天看它光秃秃地站着。我发现自己也没那么烦躁了——原来生活是有节奏的，不必每时每刻都那么紧。\n\n那棵树教会我一件事：不必急着开花，时候到了，自然会开。",
+    vocab: "一簇（cù）：聚集成一堆。缺席：本来该到却没有到。"
+  },
+  {
+    title: "三十岁以后",
+    author: "张爱玲",
+    source: "散文摘录",
+    content: "三十岁是一个分水岭。\n\n三十岁之前，我们都在往前冲。冲学业，冲事业，冲爱情，冲一切看起来很重要的东西。我们觉得时间还多，机会还多，错了可以重来。\n\n三十岁之后，忽然就不一样了。你开始意识到时间是有限的，身体是会老的，机会是会少的，有些错了不能重来。\n\n你开始懂得取舍。不再什么都要，不再什么都争。你开始明白，有些东西，争来了也是累赘；有些人，留住了也是负担。\n\n三十岁之后的女人，最美的状态是：知道自己要什么，也知道自己不要什么。\n\n不要那些虚头巴脑的社交，不要那些消耗自己的关系，不要那些看似光鲜实则空洞的目标。要把有限的精力，留给真正重要的人和事——健康的身体，真心的伴侣，可爱的孩子，三两知己，还有那个越来越清晰的自己。\n\n三十岁不是青春的终点，是清醒的起点。是从这一刻开始，你才真正地为自己而活。",
+    vocab: "分水岭：分界线。累赘（zhui）：多余而成为负担。虚头巴脑：虚假不实在。"
+  },
+  {
+    title: "慢生活",
+    author: "蒋勋",
+    source: "散文摘录",
+    content: "我一直提倡慢生活，可总有人说：哪有时间慢。\n\n是的，我们都太忙了。忙着赚钱，忙着养家，忙着证明自己。忙到吃饭只花五分钟，忙到陪孩子时还在回消息，忙到和爱人说话时眼睛盯着手机。\n\n可是你有没有想过，忙是为了什么？\n\n忙是为了更好的生活，可忙着忙着，生活却没了。\n\n我有一个朋友，是公司高管，年薪百万。她每天工作十四个小时，没有周末，没有假期。她给孩子买最贵的玩具，给家里请最好的保姆，可孩子最亲的是保姆，不是她。\n\n有一天她生病住院，躺在病床上才发现，她已经三年没有好好看过一次日落了。\n\n慢，不是懒惰，不是不上进。慢，是给生活留白，让灵魂跟上身体的脚步。\n\n慢下来，你才能闻到饭菜的香，听到孩子的笑声，看见爱人眼里的疲惫。慢下来，你才知道自己真正想要的是什么。\n\n从今天起，试着慢一点。吃饭时放下手机，陪孩子时全心全意，洗澡时感受水温。把这些小事做好，生活就有了质感。\n\n生活不是百米冲刺，是马拉松。跑得快不如跑得久。",
+    vocab: "留白：刻意留出空白。质感：指物品的质地和给人的感觉，引申为生活的品质。"
+  }
+];
+
+function getDailySeed() {
+  const today = todayKey();
+  let hash = 0;
+  for (let i = 0; i < today.length; i++) { hash = ((hash << 5) - hash) + today.charCodeAt(i); hash |= 0; }
+  return Math.abs(hash);
+}
+
+async function loadReading(forceRefresh) {
+  const card = document.getElementById('readingCard');
+  const meta = document.getElementById('readingMeta');
+  const today = todayKey();
+  const cacheKey = `reading_${today}`;
+  if (!forceRefresh) {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) { try { renderReading(JSON.parse(cached), today, false); return; } catch(e){} }
+  }
+  card.innerHTML = '<div class="hot-loading">加载今日阅读...</div>';
+  meta.textContent = '';
+  // 用日期种子选当天文章，保证每天固定一篇
+  let essay = READING_LIBRARY[getDailySeed() % READING_LIBRARY.length];
+  // "换一篇"时随机选另一篇
+  if (forceRefresh) {
+    let next;
+    do { next = READING_LIBRARY[Math.floor(Math.random() * READING_LIBRARY.length)]; }
+    while (next.title === essay.title && READING_LIBRARY.length > 1);
+    essay = next;
+  }
+  const daily = { essay };
+  if (!forceRefresh) { try { localStorage.setItem(cacheKey, JSON.stringify(daily)); } catch(e){} }
+  renderReading(daily, today, forceRefresh);
+}
+
+function renderReading(daily, date, isRefresh) {
+  const card = document.getElementById('readingCard');
+  const meta = document.getElementById('readingMeta');
+  const e = daily.essay;
+  if (!e) { card.innerHTML = '<div class="empty">加载失败，点击右上角刷新</div>'; return; }
+  // 正文按换行分段
+  const paragraphs = e.content.split('\n').filter(p => p.trim()).map(p => `<p style="margin-bottom:12px;text-indent:2em;">${escapeHtml(p)}</p>`).join('');
+  card.innerHTML = `
+    <div style="text-align:center;margin-bottom:14px;">
+      <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;">${escapeHtml(e.title)}</div>
+      <div style="font-size:12px;color:var(--text-light);">—— ${escapeHtml(e.author)} · ${escapeHtml(e.source)}</div>
+    </div>
+    <div class="reading-text" style="font-size:15px;line-height:1.9;color:#374151;">${paragraphs}</div>
+    <div class="reading-vocab">📝 <b>词汇积累：</b>${escapeHtml(e.vocab)}</div>
+  `;
+  const dateStr = date.slice(5).replace('-', '/');
+  meta.textContent = isRefresh ? `${dateStr} · 已换一篇` : `${dateStr} · 每日一篇 · 约3-5分钟阅读`;
+}
+
+
+// ============ 女装爆款推荐 + 热点视频 ============
+const HOT_KEYWORDS = ['穿搭', '秋冬穿搭', '显瘦', '微胖', '小个子', '时尚', '韩系', '法式'];
+const VIDEO_KEYWORDS = ['OOTD', '牛仔', '大衣', '时尚', '韩系', '法式', '穿搭'];
+const BLACKLIST = /大衣哥|股价|波司登.*跌|A股|美股|基金/;
+
+function formatHot(v) {
+  const n = parseInt(v);
+  if (isNaN(n)) return String(v);
+  if (n >= 100000000) return (n/100000000).toFixed(1) + '亿';
+  if (n >= 10000) return (n/10000).toFixed(1) + '万';
+  return String(n);
+}
+
+function renderHotItemHTML(item, i, withSource) {
+  const rankClass = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : 'rn';
+  const hot = item.hot_value ? formatHot(item.hot_value) : '';
+  const sourceRaw = item.source || '';
+  const sourceLabel = sourceRaw === 'douyin' ? '抖音' : (sourceRaw === 'xiaohongshu' ? '小红书' : sourceRaw);
+  const sourceTag = (withSource && sourceLabel) ? `<span class="source-tag">${escapeHtml(sourceLabel)}</span>` : '';
+  return `<a class="hot-item" href="${escapeAttr(item.url || '#')}" target="_blank" rel="noopener">
+    <div class="hot-rank ${rankClass}">${i+1}</div>
+    <div class="hot-title">${sourceTag}${escapeHtml(item.title)}</div>
+    ${hot ? `<div class="hot-hot">🔥 ${hot}</div>` : ''}
+  </a>`;
+}
+
+async function searchFashionHot(keywords, rangeDays) {
+  const nowMs = Date.now();
+  const startMs = nowMs - (rangeDays || 30) * 86400000;
+  const results = new Map();
+  for (const kw of keywords) {
+    const url = `https://uapis.cn/api/v1/misc/hotboard?type=douyin&keyword=${encodeURIComponent(kw)}&time_start=${startMs}&time_end=${nowMs}`;
+    try {
+      const r = await fetch(url);
+      const data = await r.json();
+      if (data && Array.isArray(data.items)) {
+        data.items.forEach(it => {
+          const title = it.title;
+          if (BLACKLIST.test(title)) return;
+          const hot = parseInt(it.hot_value) || 0;
+          if (!results.has(title) || hot > parseInt(results.get(title).hot_value)) {
+            results.set(title, { ...it, hot_value: hot, keyword: kw });
+          }
+        });
+      }
+    } catch(e) {}
+  }
+  return Array.from(results.values()).sort((a, b) => b.hot_value - a.hot_value);
+}
+
+async function loadFashionHot() {
+  const container = document.getElementById('fashionHotList');
+  const meta = document.getElementById('fashionHotMeta');
+  container.innerHTML = '<div class="hot-loading">加载中...</div>';
+  meta.textContent = '';
+  try {
+    const items = await searchFashionHot(HOT_KEYWORDS, 30);
+    if (items.length === 0) {
+      container.innerHTML = '<div class="empty">暂无女装爆款推荐，点击刷新重试</div>';
+      return;
+    }
+    container.innerHTML = items.slice(0, 15).map((item, i) => renderHotItemHTML(item, i, false)).join('');
+    meta.textContent = `抖音热搜 · ${items.length} 条穿搭爆款 · 近30天 · 按热度排序`;
+  } catch(e) {
+    container.innerHTML = '<div class="empty">⚠️ 加载失败，点击刷新重试</div>';
+  }
+}
+
+async function loadFashionVideo() {
+  const container = document.getElementById('fashionVideoList');
+  const meta = document.getElementById('fashionVideoMeta');
+  container.innerHTML = '<div class="hot-loading">加载中...</div>';
+  meta.textContent = '';
+  try {
+    const items = await searchFashionHot(VIDEO_KEYWORDS, 30);
+    if (items.length === 0) {
+      container.innerHTML = '<div class="empty">暂无热点女装视频，点击刷新重试</div>';
+      return;
+    }
+    container.innerHTML = items.slice(0, 15).map((item, i) => renderHotItemHTML(item, i, true)).join('');
+    meta.textContent = `抖音热搜 · ${items.length} 条热点视频 · 近30天 · 按热度排序`;
+  } catch(e) {
+    container.innerHTML = '<div class="empty">⚠️ 加载失败，点击刷新重试</div>';
+  }
+}
+
+// ============ AI视频 ============
+function renderVideos() {
+  const list = document.getElementById('videoList');
+  let videos = state.videos;
+  if (videoFilter !== 'all') videos = videos.filter(v => v.status === videoFilter);
+  if (videos.length === 0) {
+    list.innerHTML = '<div class="empty">还没有AI视频记录，点击右上角新建选题</div>';
+    return;
+  }
+  list.innerHTML = videos.map(v => `
+    <div class="video-card">
+      <div class="video-title-row">
+        <input class="video-title" value="${escapeAttr(v.title)}" onchange="updateVideoField(${v.id}, 'title', this.value)">
+        <span class="status-badge status-${v.status}">${v.status}</span>
+      </div>
+      <div class="video-field"><label>📝 脚本要点</label><textarea onchange="updateVideoField(${v.id}, 'script', this.value)" placeholder="开头钩子、核心内容...">${escapeHtml(v.script || '')}</textarea></div>
+      <div class="video-field"><label>💬 备注 / 发布数据</label><input type="text" value="${escapeAttr(v.notes || '')}" onchange="updateVideoField(${v.id}, 'notes', this.value)" placeholder="发布日期、播放量、复盘"></div>
+      <div class="video-status-select">
+        ${VIDEO_STATUSES.map(s => `<div class="vs-btn ${v.status === s ? 'active' : ''}" onclick="setVideoStatus(${v.id}, '${s}')">${s}</div>`).join('')}
+      </div>
+      <div class="video-actions">
+        <span class="del-btn" onclick="delVideo(${v.id})">🗑 删除</span>
+        <span style="font-size:11px;color:var(--text-light);">创建于 ${escapeHtml(v.createdAt)}</span>
+      </div>
+    </div>
+  `).join('');
+}
+function filterVideo(status, el) {
+  videoFilter = status;
+  document.querySelectorAll('.video-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderVideos();
+}
+function openVideoModal() {
+  document.getElementById('vidTitle').value = '';
+  document.getElementById('vidScript').value = '';
+  document.getElementById('videoModal').classList.add('show');
+}
+function addVideo() {
+  const title = document.getElementById('vidTitle').value.trim();
+  if (!title) { alert('请输入选题标题'); return; }
+  const script = document.getElementById('vidScript').value.trim();
+  state.videos.unshift({ id: state.videoSeq++, title, script, status: '选题', notes: '', createdAt: todayKey() });
+  saveState(); renderVideos(); closeModal('videoModal');
+}
+function updateVideoField(id, field, val) {
+  const v = state.videos.find(x => x.id === id);
+  if (v) { v[field] = val; saveState(); }
+}
+function setVideoStatus(id, status) {
+  const v = state.videos.find(x => x.id === id);
+  if (v) { v.status = status; saveState(); renderVideos(); }
+}
+function delVideo(id) {
+  if (!confirm('删除这个视频记录？')) return;
+  state.videos = state.videos.filter(x => x.id !== id);
+  saveState(); renderVideos();
+}
+
+// ============ 数据统计 ============
+function renderWeekStats() {
+  const container = document.getElementById('weekStats');
+  let html = '<div style="font-size:13px;line-height:2;">';
+  const today = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const day = state.days[key];
+    const isToday = key === todayKey();
+    let status = '—';
+    if (day && day.tasks.length > 0) {
+      const done = day.tasks.filter(t => t.done).length;
+      const total = day.tasks.length;
+      status = done === total ? '✅ 全完成' : `${done}/${total}`;
+    }
+    html += `<div style="display:flex;justify-content:space-between;padding:4px 0;${isToday ? 'font-weight:700;color:var(--primary);' : ''}">
+      <span>${d.getMonth()+1}/${d.getDate()} ${isToday ? '(今天)' : ''}</span><span>${status}</span></div>`;
+  }
+  html += '</div>';
+  const published = state.videos.filter(v => v.status === '已发布').length;
+  html += `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:13px;line-height:2;">
+    <div>🎬 视频总数：<b>${state.videos.length}</b></div><div>✅ 已发布：<b>${published}</b></div><div>⚙️ 进行中：<b>${state.videos.length - published}</b></div></div>`;
+  container.innerHTML = html;
+}
+
+// ============ 导入导出 ============
+function exportData() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `小瑶工作台_备份_${todayKey()}.json`; a.click();
+  URL.revokeObjectURL(url);
+}
+function importData() { document.getElementById('importFile').click(); }
+function handleImport(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!confirm('导入会覆盖当前数据，确定？')) return;
+      state = Object.assign(defaultState(), imported);
+      saveState(); renderAll(); alert('导入成功！');
+    } catch(err) { alert('导入失败：文件格式错误'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ============ 工具 ============
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+function escapeHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function escapeAttr(s) { return escapeHtml(s); }
+
+// ============ 主渲染 ============
+function renderAll() {
+  renderHeader(); renderTasks(); renderVideos(); renderWeekStats();
+}
+
+// ============ 初始化 ============
+(function init() {
+  const today = todayKey();
+  if (state.lastOpen !== today) { state.lastOpen = today; saveState(); }
+  renderAll();
+  loadReading(false);
+  loadFashionHot();
+  loadFashionVideo();
+  document.querySelectorAll('.modal-mask').forEach(m => {
+    m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); });
+  });
+})();
+</script>
+</body>
+</html>
