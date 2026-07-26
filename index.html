@@ -334,6 +334,65 @@
   </div>
 </div>
 
+<!-- ====== 作业战场（植物大战僵尸） ====== -->
+<div class="page" id="page-battle">
+  <div class="layout" style="grid-template-columns:1fr;">
+    <div class="col">
+      <div class="card">
+        <div class="section-header">
+          <div class="section-title"><span class="section-icon" style="background:rgba(34,197,94,0.12);">⚔️</span>作业战场</div>
+          <span class="section-action" onclick="openBattleTaskModal()">+ 添加作业</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-light);margin-bottom:12px;">每完成一项作业 = 种一棵植物 = 击退一波僵尸 🧟‍♂️</div>
+        <div id="battleTaskList"></div>
+      </div>
+
+      <!-- 战场 -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div id="battleArena" style="position:relative;background:linear-gradient(180deg,#7cb342 0%,#689f38 50%,#558b2f 100%);min-height:380px;">
+          <!-- 草坪网格 + 植物 + 僵尸 + 子弹，用 canvas 或 DOM 渲染 -->
+          <div id="battleStatus" style="position:absolute;top:12px;left:0;right:0;text-align:center;color:white;font-size:15px;font-weight:700;text-shadow:1px 1px 2px rgba(0,0,0,0.5);z-index:10;">
+            ⚔️ 完成作业，种下植物，保卫家园！
+          </div>
+          <div id="battleScore" style="position:absolute;top:36px;left:0;right:0;text-align:center;color:#ffeb3b;font-size:13px;font-weight:600;text-shadow:1px 1px 2px rgba(0,0,0,0.5);z-index:10;">
+            🧟‍♂️ 剩余僵尸: <span id="zombieCount">0</span> | 🌻 阳光: <span id="sunCount">50</span>
+          </div>
+          <canvas id="battleCanvas" width="400" height="380" style="display:block;width:100%;"></canvas>
+        </div>
+      </div>
+
+      <!-- 战报 -->
+      <div class="card">
+        <div class="section-header"><div class="section-title"><span class="section-icon">📜</span>战报</div></div>
+        <div id="battleLog" style="font-size:13px;line-height:1.8;color:var(--text-light);">
+          <div class="empty">还没有战斗记录，完成一项作业试试！</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 添加作业弹窗 -->
+<div class="modal-mask" id="battleTaskModal">
+  <div class="modal">
+    <span class="modal-close" onclick="closeModal('battleTaskModal')">×</span>
+    <div class="modal-title">添加作业项</div>
+    <div class="form-group">
+      <label class="form-label">作业名称</label>
+      <input type="text" class="form-input" id="battleTaskName" placeholder="如：写生字5个">
+    </div>
+    <div class="form-group">
+      <label class="form-label">僵尸种类（选填）</label>
+      <select class="form-input" id="battleZombieType">
+        <option value="普通">🧟 普通僵尸</option>
+        <option value="路障">🧟‍♂️ 路障僵尸（更耐打）</option>
+        <option value="铁桶">🧟‍♂️ 铁桶僵尸（很耐打）</option>
+      </select>
+    </div>
+    <button class="btn-primary" onclick="addBattleTask()">添加</button>
+  </div>
+</div>
+
 <!-- ====== 数据页 ====== -->
 <div class="page" id="page-stats">
   <div class="layout" style="grid-template-columns:1fr;">
@@ -360,6 +419,7 @@
 <!-- 底部导航 -->
 <div class="tabbar">
   <div class="tab-item active" onclick="switchPage('home', this)"><span class="tab-icon">🏠</span>工作台</div>
+  <div class="tab-item" onclick="switchPage('battle', this)"><span class="tab-icon">⚔️</span>作业战场</div>
   <div class="tab-item" onclick="switchPage('video', this)"><span class="tab-icon">🎬</span>AI视频</div>
   <div class="tab-item" onclick="switchPage('stats', this)"><span class="tab-icon">📊</span>数据</div>
 </div>
@@ -726,6 +786,379 @@ function delVideo(id) {
   saveState(); renderVideos();
 }
 
+// ============ 作业战场（植物大战僵尸） ============
+const BATTLE_STORE_KEY = 'xiaoyao_battle_state';
+const PLANT_TYPES = [
+  { id: 'peashooter', emoji: '🌱', name: '豌豆射手', cost: 100, damage: 20, fireRate: 1500, color: '#4caf50' },
+  { id: 'sunflower', emoji: '🌻', name: '向日葵', cost: 50, damage: 0, fireRate: 8000, color: '#ffc107', produceSun: 25 },
+  { id: 'wallnut', emoji: '🥜', name: '坚果墙', cost: 50, damage: 0, fireRate: 0, color: '#8d6e63', hp: 400 },
+  { id: 'cherry', emoji: '🍒', name: '樱桃炸弹', cost: 150, damage: 500, fireRate: 100, color: '#f44336', oneTime: true }
+];
+const ZOMBIE_TYPES = {
+  '普通': { hp: 80, speed: 0.3, emoji: '🧟', color: '#795548' },
+  '路障': { hp: 160, speed: 0.25, emoji: '🧟‍♂️', color: '#ff9800' },
+  '铁桶': { hp: 300, speed: 0.2, emoji: '🧟‍♂️', color: '#607d8b' }
+};
+const DEFAULT_BATTLE_TASKS = [
+  { id: 1, name: '阅读', zombieType: '普通', done: false, plantType: 'peashooter' },
+  { id: 2, name: '口算', zombieType: '路障', done: false, plantType: 'peashooter' },
+  { id: 3, name: '写字', zombieType: '铁桶', done: false, plantType: 'peashooter' }
+];
+
+let battleState = loadBattleState();
+let battleAnim = null; // requestAnimationFrame id
+let battleEntities = { plants: [], zombies: [], bullets: [], suns: [] };
+let battleSun = 50;
+let battleGameOver = false;
+let battleWon = false;
+
+function loadBattleState() {
+  try {
+    const raw = localStorage.getItem(BATTLE_STORE_KEY);
+    if (!raw) return { tasks: JSON.parse(JSON.stringify(DEFAULT_BATTLE_TASKS)), seq: 100, log: [] };
+    const s = JSON.parse(raw);
+    if (!s.tasks) s.tasks = JSON.parse(JSON.stringify(DEFAULT_BATTLE_TASKS));
+    if (!s.seq) s.seq = 100;
+    if (!s.log) s.log = [];
+    return s;
+  } catch(e) { return { tasks: JSON.parse(JSON.stringify(DEFAULT_BATTLE_TASKS)), seq: 100, log: [] }; }
+}
+function saveBattleState() { localStorage.setItem(BATTLE_STORE_KEY, JSON.stringify(battleState)); }
+
+function renderBattleTasks() {
+  const list = document.getElementById('battleTaskList');
+  if (battleState.tasks.length === 0) {
+    list.innerHTML = '<div class="empty">还没有作业项，点击右上角添加</div>';
+    return;
+  }
+  list.innerHTML = battleState.tasks.map(t => {
+    const z = ZOMBIE_TYPES[t.zombieType] || ZOMBIE_TYPES['普通'];
+    return `<div class="task-item ${t.done ? 'done' : ''}" style="background:${t.done ? 'rgba(76,175,80,0.1)' : 'var(--bg)'};">
+      <div class="check-btn ${t.done ? 'checked' : ''}" onclick="toggleBattleTask(${t.id})" style="${t.done ? '' : 'border-color:#4caf50;'}">${t.done ? '🌱' : ''}</div>
+      <div style="flex:1;">
+        <div class="task-name">${escapeHtml(t.name)} ${t.done ? '<span style="font-size:12px;color:#4caf50;">✅ 植物已种下</span>' : ''}</div>
+        <div class="task-meta">${z.emoji} ${t.zombieType}僵尸 · HP ${z.hp}</div>
+      </div>
+      <span class="del-btn" onclick="delBattleTask(${t.id})">×</span>
+    </div>`;
+  }).join('');
+}
+
+function openBattleTaskModal() {
+  document.getElementById('battleTaskName').value = '';
+  document.getElementById('battleZombieType').value = '普通';
+  document.getElementById('battleTaskModal').classList.add('show');
+}
+function addBattleTask() {
+  const name = document.getElementById('battleTaskName').value.trim();
+  if (!name) { alert('请输入作业名称'); return; }
+  const zombieType = document.getElementById('battleZombieType').value;
+  battleState.tasks.push({ id: battleState.seq++, name, zombieType, done: false, plantType: 'peashooter' });
+  saveBattleState();
+  renderBattleTasks();
+  updateBattleStatus();
+  closeModal('battleTaskModal');
+}
+function toggleBattleTask(id) {
+  const t = battleState.tasks.find(x => x.id === id);
+  if (!t) return;
+  t.done = !t.done;
+  saveBattleState();
+  renderBattleTasks();
+  if (t.done) {
+    addBattleLog(`✅ 完成「${t.name}」！种下一棵豌豆射手 🌱 攻击 ${t.zombieType}僵尸！`);
+    spawnPlantForTask(t);
+  } else {
+    addBattleLog(`↩️ 取消「${t.name}」，植物被移除`);
+  }
+  updateBattleStatus();
+  restartBattle();
+}
+function delBattleTask(id) {
+  if (!confirm('删除这个作业项？')) return;
+  battleState.tasks = battleState.tasks.filter(x => x.id !== id);
+  saveBattleState();
+  renderBattleTasks();
+  updateBattleStatus();
+  restartBattle();
+}
+
+function addBattleLog(msg) {
+  const time = new Date().toTimeString().slice(0,5);
+  battleState.log.unshift(`[${time}] ${msg}`);
+  if (battleState.log.length > 20) battleState.log.pop();
+  saveBattleState();
+  renderBattleLog();
+}
+function renderBattleLog() {
+  const el = document.getElementById('battleLog');
+  if (battleState.log.length === 0) {
+    el.innerHTML = '<div class="empty">还没有战斗记录，完成一项作业试试！</div>';
+    return;
+  }
+  el.innerHTML = battleState.log.map(l => `<div style="padding:3px 0;border-bottom:1px solid var(--border);">${escapeHtml(l)}</div>`).join('');
+}
+
+function updateBattleStatus() {
+  const total = battleState.tasks.length;
+  const done = battleState.tasks.filter(t => t.done).length;
+  const remaining = total - done;
+  document.getElementById('zombieCount').textContent = remaining;
+  document.getElementById('sunCount').textContent = battleSun;
+  const status = document.getElementById('battleStatus');
+  if (total === 0) {
+    status.textContent = '⚔️ 添加作业项，开始战斗！';
+  } else if (done === total) {
+    status.textContent = '🏆 全部作业完成！僵尸被击退，家园保卫成功！';
+    status.style.color = '#ffeb3b';
+  } else {
+    status.textContent = `⚔️ 已击退 ${done}/${total} 波僵尸，继续加油！`;
+    status.style.color = 'white';
+  }
+}
+
+// === Canvas 战场渲染 ===
+function getCanvas() { return document.getElementById('battleCanvas'); }
+function getCtx() { return getCanvas().getContext('2d'); }
+
+function spawnPlantForTask(task) {
+  // 为完成的作业种一棵植物
+  const canvas = getCanvas();
+  const lanes = Math.max(3, battleState.tasks.length);
+  const laneIdx = battleState.tasks.indexOf(task);
+  const laneH = canvas.height / lanes;
+  const x = 60 + Math.random() * 40;
+  const y = laneIdx * laneH + laneH / 2;
+  battleEntities.plants.push({
+    x, y, lane: laneIdx,
+    type: 'peashooter',
+    hp: 100, lastFire: 0,
+    taskName: task.name
+  });
+}
+
+function restartBattle() {
+  // 重置战场
+  battleEntities = { plants: [], zombies: [], bullets: [], suns: [] };
+  battleGameOver = false;
+  battleWon = false;
+  battleSun = 50;
+  // 为每个已完成的作业种植物
+  battleState.tasks.filter(t => t.done).forEach(t => spawnPlantForTask(t));
+
+  // 生成僵尸（每个未完成作业 = 一个僵尸）
+  const canvas = getCanvas();
+  const lanes = Math.max(3, battleState.tasks.length);
+  const laneH = canvas.height / lanes;
+  battleState.tasks.filter(t => !t.done).forEach((t, i) => {
+    const z = ZOMBIE_TYPES[t.zombieType] || ZOMBIE_TYPES['普通'];
+    battleEntities.zombies.push({
+      x: canvas.width - 30 + Math.random() * 60,
+      y: battleState.tasks.indexOf(t) * laneH + laneH / 2,
+      lane: battleState.tasks.indexOf(t),
+      hp: z.hp, maxHp: z.hp, speed: z.speed,
+      emoji: z.emoji, color: z.color,
+      taskName: t.name, zombieType: t.zombieType
+    });
+  });
+
+  updateBattleStatus();
+  if (battleAnim) cancelAnimationFrame(battleAnim);
+  startBattleLoop();
+}
+
+function startBattleLoop() {
+  const canvas = getCanvas();
+  const ctx = getCtx();
+  let lastTime = performance.now();
+
+  function loop(now) {
+    const dt = now - lastTime;
+    lastTime = now;
+    update(dt, now);
+    render(ctx, canvas);
+    if (!battleGameOver) {
+      battleAnim = requestAnimationFrame(loop);
+    } else {
+      // 游戏结束后继续渲染静态画面
+      render(ctx, canvas);
+    }
+  }
+  battleAnim = requestAnimationFrame(loop);
+}
+
+function update(dt, now) {
+  if (battleGameOver) return;
+  const canvas = getCanvas();
+
+  // 植物发射子弹
+  battleEntities.plants.forEach(p => {
+    if (p.type === 'peashooter') {
+      if (!p.lastFire) p.lastFire = now;
+      if (now - p.lastFire > 1000) {
+        p.lastFire = now;
+        // 检查同车道有没有僵尸
+        const hasZombie = battleEntities.zombies.some(z => z.lane === p.lane && z.x > p.x);
+        if (hasZombie) {
+          battleEntities.bullets.push({ x: p.x + 25, y: p.y, lane: p.lane, damage: 25, speed: 4 });
+        }
+      }
+    }
+  });
+
+  // 子弹移动
+  battleEntities.bullets.forEach(b => { b.x += b.speed * (dt / 16); });
+  battleEntities.bullets = battleEntities.bullets.filter(b => b.x < canvas.width + 20);
+
+  // 子弹打僵尸
+  battleEntities.bullets.forEach(b => {
+    battleEntities.zombies.forEach(z => {
+      if (z.lane === b.lane && Math.abs(z.x - b.x) < 25 && b.x < z.x + 20 && b.x > z.x - 20) {
+        z.hp -= b.damage;
+        b.hit = true;
+      }
+    });
+  });
+  battleEntities.bullets = battleEntities.bullets.filter(b => !b.hit);
+
+  // 僵尸移动
+  battleEntities.zombies.forEach(z => {
+    // 检查前方是否有植物挡路
+    const blockingPlant = battleEntities.plants.find(p => p.lane === z.lane && p.x < z.x && p.x > z.x - 50);
+    if (blockingPlant) {
+      // 啃植物
+      blockingPlant.hp -= 0.05 * dt;
+    } else {
+      z.x -= z.speed;  // 固定速度，每帧移动
+    }
+  });
+
+  // 移除死僵尸
+  const deadZombies = battleEntities.zombies.filter(z => z.hp <= 0);
+  deadZombies.forEach(z => {
+    addBattleLog(`💥 ${z.taskName}僵尸被消灭！`);
+    const task = battleState.tasks.find(t => t.name === z.taskName);
+    // 僵尸死不代表作业完成，作业需要手动打勾
+  });
+  battleEntities.zombies = battleEntities.zombies.filter(z => z.hp > 0);
+
+  // 移除死植物
+  battleEntities.plants = battleEntities.plants.filter(p => p.hp > 0);
+
+  // 判断胜负
+  if (battleEntities.zombies.length === 0 && battleState.tasks.some(t => t.done)) {
+    if (!battleWon) {
+      battleWon = true;
+      battleGameOver = true;
+      const doneCount = battleState.tasks.filter(t => t.done).length;
+      addBattleLog(`🏆 胜利！击退 ${doneCount} 波僵尸，家园保卫成功！`);
+      updateBattleStatus();
+    }
+  }
+  // 僵尸冲进房子（x < 20）
+  const reached = battleEntities.zombies.find(z => z.x < 15);
+  if (reached) {
+    if (!battleGameOver) {
+      battleGameOver = true;
+      addBattleLog(`💀 ${reached.taskName}僵尸冲进了房子！快去完成作业阻止它！`);
+      document.getElementById('battleStatus').textContent = `💀 ${reached.taskName}僵尸冲进房子了！完成作业来阻止！`;
+      document.getElementById('battleStatus').style.color = '#ef4444';
+    }
+  }
+}
+
+function render(ctx, canvas) {
+  const w = canvas.width, h = canvas.height;
+  const lanes = Math.max(3, battleState.tasks.length);
+  const laneH = h / lanes;
+
+  // 清屏 + 草坪
+  ctx.fillStyle = '#7cb342';
+  ctx.fillRect(0, 0, w, h);
+  // 草坪条纹
+  for (let i = 0; i < lanes; i++) {
+    ctx.fillStyle = i % 2 === 0 ? '#689f38' : '#7cb342';
+    ctx.fillRect(0, i * laneH, w, laneH);
+  }
+
+  // 房子（左边）
+  ctx.fillStyle = '#8d6e63';
+  ctx.fillRect(0, 0, 40, h);
+  ctx.fillStyle = '#5d4037';
+  ctx.fillRect(0, 0, 8, h);
+  // 房顶
+  ctx.fillStyle = '#b71c1c';
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(40, 0);
+  ctx.lineTo(20, -15);
+  ctx.closePath();
+  ctx.fill();
+
+  // 车道标签
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  battleState.tasks.forEach((t, i) => {
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText(t.name, 60, i * laneH + 14);
+  });
+
+  // 渲染植物
+  battleEntities.plants.forEach(p => {
+    ctx.font = '24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('🌱', p.x, p.y + 8);
+    // 血条
+    if (p.hp < 100) {
+      ctx.fillStyle = '#333';
+      ctx.fillRect(p.x - 15, p.y - 20, 30, 4);
+      ctx.fillStyle = p.hp > 50 ? '#4caf50' : '#ff9800';
+      ctx.fillRect(p.x - 15, p.y - 20, 30 * (p.hp / 100), 4);
+    }
+  });
+
+  // 渲染子弹（豌豆）
+  battleEntities.bullets.forEach(b => {
+    ctx.fillStyle = '#4caf50';
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#2e7d32';
+    ctx.stroke();
+  });
+
+  // 渲染僵尸
+  battleEntities.zombies.forEach(z => {
+    ctx.font = '26px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(z.emoji, z.x, z.y + 8);
+    // 血条
+    ctx.fillStyle = '#333';
+    ctx.fillRect(z.x - 15, z.y - 22, 30, 4);
+    const hpRatio = z.hp / z.maxHp;
+    ctx.fillStyle = hpRatio > 0.5 ? '#f44336' : (hpRatio > 0.25 ? '#ff9800' : '#ffeb3b');
+    ctx.fillRect(z.x - 15, z.y - 22, 30 * hpRatio, 4);
+  });
+
+  // 胜利/失败提示
+  if (battleGameOver) {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, h/2 - 40, w, 80);
+    ctx.font = 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = battleWon ? '#ffeb3b' : '#ef4444';
+    ctx.fillText(battleWon ? '🏆 胜利！' : '💀 僵尸入侵！', w/2, h/2 + 8);
+  }
+}
+
+function initBattle() {
+  renderBattleTasks();
+  renderBattleLog();
+  updateBattleStatus();
+  // 等 canvas 渲染后再启动
+  setTimeout(() => { restartBattle(); }, 100);
+}
+
 // ============ 数据统计 ============
 function renderWeekStats() {
   const container = document.getElementById('weekStats');
@@ -784,7 +1217,7 @@ function escapeAttr(s) { return escapeHtml(s); }
 
 // ============ 主渲染 ============
 function renderAll() {
-  renderHeader(); renderTasks(); renderVideos(); renderWeekStats();
+  renderHeader(); renderTasks(); renderVideos(); renderWeekStats(); initBattle();
 }
 
 // ============ 初始化 ============
